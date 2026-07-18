@@ -1,0 +1,17 @@
+# local planning docs
+INITIAL_RESEARCH.md
+EXECUTION_PLAN.md
+learn/
+
+# dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+oclif.manifest.json
+
+# local data and secrets
+*.db
+.tokenzempic/
+.env
+.sf/
+.sfdx/

@@ -1,0 +1,35 @@
+{
+  "name": "tokenzempic",
+  "version": "0.0.1",
+  "description": "sf CLI plugin that studies what your Agentforce agent does repeatedly and turns the repeats into plain Flows and Apex, one reviewed PR at a time.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "oclif.manifest.json"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "@oclif/core": "^4.0.0",
+    "@salesforce/core": "^8.0.0",
+    "@salesforce/sf-plugins-core": "^12.0.0",
+    "@tokenzempic/core": "0.0.1",
+    "@tokenzempic/tui": "0.0.1"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "oclif": {
+    "commands": "./dist/commands",
+    "bin": "sf",
+    "topicSeparator": " ",
+    "topics": {
+      "tokenzempic": {
+        "description": "Study your Agentforce agent and distill its repeats into Flows and Apex."
+      }
+    }
+  }
+}

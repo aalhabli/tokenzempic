@@ -1,0 +1,15 @@
+{
+  "name": "@tokenzempic/tui",
+  "version": "0.0.1",
+  "description": "Terminal dashboard for the watch command. Placeholder until v0.3 — Ink lands here later so the CLI stays light until then.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  }
+}

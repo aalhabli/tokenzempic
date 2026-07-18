@@ -1,0 +1,27 @@
+{
+  "name": "tokenzempic-workspace",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Workspace root for tokenzempic. The installable plugin lives in packages/cli.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "build": "npm run build -w @tokenzempic/core -w @tokenzempic/tui && npm run build -w tokenzempic",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint packages/*/src",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^3.0.0"
+  }
+}

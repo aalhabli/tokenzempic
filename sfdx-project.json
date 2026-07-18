@@ -1,0 +1,11 @@
+{
+  "name": "tokenzempic",
+  "namespace": "",
+  "sourceApiVersion": "66.0",
+  "packageDirectories": [
+    {
+      "path": "demo/force-app",
+      "default": true
+    }
+  ]
+}

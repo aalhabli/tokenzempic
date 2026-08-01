@@ -1,17 +1,24 @@
 version: 2
+
+# Three pull requests a week at most: one npm safe bump, one npm major bump,
+# one for the actions. A security update arrives on its own, outside these
+# groups and outside the limit. Do not ignore a major version here. An ignore
+# rule also suppresses the security update that needs that major version.
+
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     groups:
-      # One pull request for the routine development updates. A production
-      # dependency still gets its own pull request.
-      dev-dependencies:
-        dependency-type: development
+      npm:
+        patterns: ['*']
         update-types: [minor, patch]
+      npm-major:
+        patterns: ['*']
+        update-types: [major]
     commit-message:
       prefix: 'update'
 
@@ -20,6 +27,7 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    open-pull-requests-limit: 1
     groups:
       actions:
         patterns: ['*']

@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@oclif/core": "^4.0.0",
-    "@salesforce/core": "^8.0.0",
+    "@salesforce/core": "^8.32.6",
     "@salesforce/sf-plugins-core": "^12.0.0",
     "@tokenzempic/core": "0.0.1",
     "@tokenzempic/tui": "0.0.1"

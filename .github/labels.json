@@ -1,0 +1,28 @@
+[
+  { "name": "epic", "color": "6f42c1", "description": "A group of task issues that deliver one outcome" },
+  { "name": "spike", "color": "8250df", "description": "A time-boxed question. The answer is the deliverable." },
+  { "name": "bug", "color": "d73a4a", "description": "Something behaves in the wrong way" },
+  { "name": "enhancement", "color": "a2eeef", "description": "A new capability" },
+  { "name": "documentation", "color": "0075ca", "description": "Docs, templates, and process" },
+
+  { "name": "area:cli", "color": "1d76db", "description": "The sf plugin commands" },
+  { "name": "area:core", "color": "1d76db", "description": "The core library" },
+  { "name": "area:ingest", "color": "1d76db", "description": "Pollers, normalizer, and local storage" },
+  { "name": "area:patterns", "color": "1d76db", "description": "Clustering and the audit report" },
+  { "name": "area:codegen", "color": "1d76db", "description": "Apex generation and the parity tests" },
+  { "name": "area:github", "color": "1d76db", "description": "Branch, commit, and pull request automation" },
+  { "name": "area:tui", "color": "1d76db", "description": "The terminal dashboard" },
+  { "name": "area:demo", "color": "1d76db", "description": "The demo org and its seed data" },
+  { "name": "area:docs", "color": "1d76db", "description": "Documentation and process files" },
+  { "name": "area:ci", "color": "1d76db", "description": "Workflows, tooling, and releases" },
+
+  { "name": "P0", "color": "b60205", "description": "Drop everything" },
+  { "name": "P1", "color": "d93f0b", "description": "Next" },
+  { "name": "P2", "color": "fbca04", "description": "Soon" },
+  { "name": "P3", "color": "c2e0c6", "description": "Someday" },
+
+  { "name": "blocked", "color": "000000", "description": "Waits on something outside this issue" },
+  { "name": "needs-decision", "color": "e99695", "description": "Waits on a call from the maintainer" },
+  { "name": "good first issue", "color": "7057ff", "description": "A small, self-contained first change" },
+  { "name": "help wanted", "color": "008672", "description": "Outside help is welcome here" }
+]

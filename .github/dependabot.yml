@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # One pull request for the routine development updates. A production
+      # dependency still gets its own pull request.
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+    commit-message:
+      prefix: 'update'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: 'update'

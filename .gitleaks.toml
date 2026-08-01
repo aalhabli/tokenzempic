@@ -1,0 +1,39 @@
+title = "tokenzempic"
+
+[extend]
+useDefault = true
+
+# The default rule set covers the well-known providers. These rules cover the
+# credentials that this tool handles directly.
+
+[[rules]]
+id = "sfdx-auth-url"
+description = "Salesforce CLI auth URL (holds a refresh token)"
+regex = '''force://[A-Za-z0-9._-]+::[A-Za-z0-9._~+/=-]{20,}@[A-Za-z0-9._-]+'''
+tags = ["salesforce", "credential", "refresh-token"]
+
+[[rules]]
+id = "salesforce-session-id"
+description = "Salesforce session ID or access token"
+regex = '''00[DQ][A-Za-z0-9]{12,15}![A-Za-z0-9._+/=-]{40,}'''
+tags = ["salesforce", "credential", "access-token"]
+
+[[rules]]
+id = "salesforce-connected-app-secret"
+description = "Salesforce connected app consumer secret"
+regex = '''(?i)(consumer[_-]?secret|client[_-]?secret)["'\s:=]{1,10}([0-9A-F]{64}|[0-9]{15,20})'''
+secretGroup = 2
+tags = ["salesforce", "credential"]
+
+[[rules]]
+id = "tokenzempic-config-llm-key"
+description = "LLM API key written into a tokenzempic config file"
+regex = '''(?i)"(llmApiKey|apiKey|openaiApiKey|anthropicApiKey)"\s*:\s*"[A-Za-z0-9_\-]{20,}"'''
+tags = ["llm", "credential"]
+
+[allowlist]
+description = "Paths that hold the patterns themselves, not real secrets"
+paths = [
+  '''\.gitleaks\.toml$''',
+  '''(^|/)docs/style-guide\.md$''',
+]

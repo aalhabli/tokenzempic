@@ -1,6 +1,8 @@
 # tokenzempic
 
-*Put your agent on a zero token diet.*
+<!-- ste:off -->
+
+*Put your Salesforce Agentforce agents on a zero token diet.*
 
 Your Agentforce agent answered the same question 400 times last month. You paid it to think, every time.
 
@@ -21,13 +23,19 @@ Salesforce's own architecture guide calls using an agent for repeatable work an 
 - Conversational agents: one cheap classifier call replaces a 5–15 call reasoning loop. Roughly 90% fewer tokens, and everything after intent capture is deterministic.
 - The agent keeps the genuinely new stuff. That's the only part worth paying per-token for.
 
+<!-- ste:on -->
+
 ## Privacy
 
-Runs entirely on your machine against your org, using supported Salesforce APIs. Session logs never leave your infrastructure. Bring your own LLM key for the small parts that need one.
+tokenzempic runs on your machine. It reads your org through the supported Salesforce APIs. Your session logs stay in your infrastructure. You bring your own LLM key for the small parts that need one.
 
 ## Status
 
-Early. Nothing to install yet. v0.1 (the read-only agent audit) is in progress. Watch the repo if you want to know when it lands.
+Early. There is nothing to install yet. Version 0.1 is the read-only agent audit, and it is in progress. Watch the repository to see when it lands.
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) first, then [the style guide](docs/style-guide.md). Report a vulnerability through [SECURITY.md](SECURITY.md), not through a public issue.
 
 ## License
 

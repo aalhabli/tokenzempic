@@ -97,7 +97,7 @@ export function usageSql(since: Date, limit: number): string {
     'SELECT AiAgentSessionId__c, AiAgentInteractionId__c, PromptInputTokenCount__c,',
     '       PromptCompletionTokenCount__c, PromptTotalTokenCount__c, UsageQuantity__c,',
     '       IsBillableIndicator__c, IsMeteredIndicator__c, ModelProviderModelName__c,',
-    '       AiAgentToolName__c',
+    '       AiAgentToolName__c, UsageTypeCode__c, UnitTypeCode__c',
     'FROM AiAgentGenerativeAiUsage_std__dlm',
     `WHERE Timestamp__c >= ${timestampLiteral(since)}`,
     `LIMIT ${limit}`,
@@ -219,6 +219,8 @@ export async function readRawTrace(
         isMetered: bool(r.IsMeteredIndicator__c),
         modelName: str(r.ModelProviderModelName__c),
         toolName: str(r.AiAgentToolName__c),
+        usageType: str(r.UsageTypeCode__c),
+        unitType: str(r.UnitTypeCode__c),
       })
     ),
     moments: moments.map(

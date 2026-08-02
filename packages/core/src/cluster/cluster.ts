@@ -55,6 +55,15 @@ export interface Cluster {
    * to judge. High means the agent rewrites the same answer every time.
    */
   answerStability: number | null;
+  /**
+   * What the org is charged across the cluster, keyed by unit. This is the
+   * bill under Flex Credits, so it leads the report and tokens support it.
+   */
+  billableUnits: Record<string, number>;
+  /** Every billable unit added up. */
+  billableTotal: number;
+  /** Mean billable units per session, to one decimal place. */
+  billablePerSession: number;
   /** Model calls across the cluster. Always available. */
   modelCalls: number;
   /**
@@ -167,6 +176,14 @@ export function clusterSessions(
       const modelCalls = part.reduce((n, s) => n + s.modelCalls, 0);
       const tokenTotal = part.reduce((n, s) => n + (s.tokens ?? 0), 0);
       const turns = part.reduce((n, s) => n + s.turns, 0);
+
+      const billableUnits: Record<string, number> = {};
+      for (const session of part) {
+        for (const [unit, n] of Object.entries(session.billableUnits)) {
+          billableUnits[unit] = (billableUnits[unit] ?? 0) + n;
+        }
+      }
+      const billableTotal = Object.values(billableUnits).reduce((n, v) => n + v, 0);
       const quality = meanScore(part, opts.qualityTagName);
       // Only the last reply of each session. Every session opens with the same
       // welcome message, and comparing greetings to answers measured the
@@ -192,6 +209,9 @@ export function clusterSessions(
         intents: [...new Set(part.flatMap((s) => s.intents))].sort(),
         turns,
         turnsPerSession: Math.round((turns / part.length) * 10) / 10,
+        billableUnits,
+        billableTotal,
+        billablePerSession: Math.round((billableTotal / part.length) * 10) / 10,
         modelCalls,
         tokens: tokenTotal > 0 ? tokenTotal : null,
         modelCallsPerSession: Math.round((modelCalls / part.length) * 10) / 10,

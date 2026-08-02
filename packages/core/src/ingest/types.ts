@@ -66,6 +66,12 @@ export interface MessageRow {
 export interface UsageRow {
   sessionId: string;
   interactionId: string | null;
+  /**
+   * What the org is charged for this row: a model call, an interaction, or an
+   * action. Salesforce bills these, not tokens.
+   */
+  usageType: string | null;
+  unitType: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
   totalTokens: number | null;

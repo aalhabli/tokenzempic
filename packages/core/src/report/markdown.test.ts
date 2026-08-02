@@ -14,6 +14,8 @@ function session(partial: Partial<SessionRecord> & { sessionId: string }): Sessi
     params: {},
     outcome: 'resolved',
     credits: null,
+    billableUnits: {},
+    billableTotal: 0,
     tokens: null,
     intents: [],
     scores: { 'Relevance Score': '5' },
@@ -61,6 +63,7 @@ describe('renderMarkdownReport', () => {
   it('leads with the counts a reader wants first', () => {
     expect(report).toContain('5 sessions fall into 3 patterns');
     expect(report).toContain('17 model calls');
+    expect(report).toContain('0 billable units');
   });
 
   it('says what compiling would remove without claiming the session is free', () => {
@@ -83,6 +86,34 @@ describe('renderMarkdownReport', () => {
     // Naming them in the disclaimer is fine. Putting a number on them is not.
     expect(report).not.toMatch(/[$£€]\s*\d/);
     expect(report).not.toMatch(/\d[\d,.]*\s*(tokens?|credits?)\b/i);
+  });
+
+  it('leads with billable units, because that is what the org is charged', () => {
+    const billed = clusterSessions([
+      session({ sessionId: 'B1', billableUnits: { ACTION: 2, INTERACTION: 1 }, billableTotal: 3 }),
+      session({ sessionId: 'B2', billableUnits: { ACTION: 2, INTERACTION: 1 }, billableTotal: 3 }),
+    ]);
+    const out = renderMarkdownReport(billed);
+    expect(out).toContain('6 billable units');
+    expect(out).toContain('4 ACTION');
+  });
+
+  it('gives no money unless the caller supplies rates', () => {
+    const billed = clusterSessions([
+      session({ sessionId: 'R1', billableUnits: { ACTION: 2 }, billableTotal: 2 }),
+      session({ sessionId: 'R2', billableUnits: { ACTION: 2 }, billableTotal: 2 }),
+    ]);
+    expect(renderMarkdownReport(billed)).not.toMatch(/\d+ credits\)/);
+    const withRates = renderMarkdownReport(billed, { unitRates: { ACTION: 20 } });
+    expect(withRates).toContain('80 credits');
+  });
+
+  it('stays silent on money when a rate is missing for one unit', () => {
+    const billed = clusterSessions([
+      session({ sessionId: 'M1', billableUnits: { ACTION: 2, INTERACTION: 1 }, billableTotal: 3 }),
+      session({ sessionId: 'M2', billableUnits: { ACTION: 2, INTERACTION: 1 }, billableTotal: 3 }),
+    ]);
+    expect(renderMarkdownReport(billed, { unitRates: { ACTION: 20 } })).not.toMatch(/credits\)/);
   });
 
   it('quotes tokens once metering has caught up', () => {
@@ -117,7 +148,7 @@ describe('renderMarkdownReport', () => {
   });
 
   it('writes a clean table row', () => {
-    expect(report).toContain('| 2 | 1 | order_status > get_order_status | Get_Order_Status |');
+    expect(report).toContain('| 2 | 1 | 0 | order_status > get_order_status | Get_Order_Status |');
   });
 
   it('does not say "1 sessions"', () => {

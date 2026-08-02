@@ -57,7 +57,19 @@ function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+/**
+ * What the org pays for one unit of each kind. The tool ships no price list:
+ * a rate depends on the contract, and a stale one would be a lie with a
+ * decimal point on it. Supply this and the report gives money. Leave it out
+ * and the report gives counts.
+ */
+export type UnitRates = Record<string, number>;
+
 export interface ReportOptions {
+  /** Credit or currency cost per billable unit, keyed by unit name. */
+  unitRates?: UnitRates;
+  /** What one unit of `unitRates` is called, for example "credits". */
+  rateLabel?: string;
   /** Agent the report describes, if the caller knows it. */
   agentName?: string;
   /** Window the sessions came from, as text the reader understands. */
@@ -74,6 +86,24 @@ export function renderMarkdownReport(
   const sessions = clusters.reduce((n, c) => n + c.sessionCount, 0);
   const modelCalls = clusters.reduce((n, c) => n + c.modelCalls, 0);
   const tokens = clusters.reduce((n, c) => n + (c.tokens ?? 0), 0);
+  const billable = clusters.reduce((n, c) => n + c.billableTotal, 0);
+  const rates = options.unitRates;
+  const rateLabel = options.rateLabel ?? 'credits';
+  const priced = (units: Record<string, number>): number | null => {
+    if (!rates) return null;
+    let total = 0;
+    for (const [unit, n] of Object.entries(units)) {
+      const rate = rates[unit];
+      if (rate === undefined) return null;
+      total += n * rate;
+    }
+    return total;
+  };
+  const allUnits: Record<string, number> = {};
+  for (const c of clusters) {
+    for (const [u, n] of Object.entries(c.billableUnits)) allUnits[u] = (allUnits[u] ?? 0) + n;
+  }
+  const totalPriced = priced(allUnits);
   const reducible = reducibleModelCalls(clusters);
   const wasted = clusters
     .filter((c) => c.verdict === 'inconsistent')
@@ -91,7 +121,9 @@ export function renderMarkdownReport(
   lines.push(
     `${plural(sessions, 'session falls', 'sessions fall')} into ` +
       `${plural(clusters.length, 'pattern', 'patterns')}. ` +
-      `They cost ${plural(modelCalls, 'model call', 'model calls')}` +
+      `They cost ${plural(billable, 'billable unit', 'billable units')}` +
+      (totalPriced !== null ? ` (${thousands(Math.round(totalPriced))} ${rateLabel})` : '') +
+      `, across ${plural(modelCalls, 'model call', 'model calls')}` +
       (tokens > 0 ? ` and ${thousands(tokens)} tokens.` : '.')
   );
   lines.push('');
@@ -122,16 +154,16 @@ export function renderMarkdownReport(
   lines.push('## What the agent does');
   lines.push('');
   lines.push(
-    '| Sessions | Turns each | Pattern | Actions | Model calls each | Tokens | Same answer | Verdict |'
+    '| Sessions | Turns each | Units each | Pattern | Actions | Tokens | Same answer | Verdict |'
   );
-  lines.push('|---:|---:|---|---|---:|---:|---:|---|');
+  lines.push('|---:|---:|---:|---|---|---:|---:|---|');
   for (const c of clusters) {
     const cells = [
       String(c.sessionCount),
       String(c.turnsPerSession),
+      String(c.billablePerSession),
       escapeCell(c.signature),
       c.actions.length ? escapeCell(c.actions.join(', ')) : 'none',
-      String(c.modelCallsPerSession),
       c.tokens === null ? 'not yet' : thousands(c.tokens),
       c.answerStability === null ? '-' : `${Math.round(c.answerStability * 100)}%`,
       VERDICT_TEXT[c.verdict],
@@ -145,9 +177,14 @@ export function renderMarkdownReport(
   for (const c of clusters) {
     lines.push(`### ${c.signature}`);
     lines.push('');
+    const unitLine = Object.entries(c.billableUnits)
+      .sort((a, b) => b[1] - a[1])
+      .map(([u, n]) => `${thousands(n)} ${u}`)
+      .join(', ');
     lines.push(
       `${plural(c.sessionCount, 'session', 'sessions')}, ` +
         `${plural(c.turns, 'customer turn', 'customer turns')}, ` +
+        (unitLine ? `${unitLine}, ` : '') +
         `${plural(c.modelCalls, 'model call', 'model calls')}, ` +
         `${c.modelCallsPerSession} per session` +
         (c.tokens === null ? '.' : `, ${thousands(c.tokens)} tokens.`)
@@ -170,7 +207,12 @@ export function renderMarkdownReport(
   lines.push('---');
   lines.push('');
   lines.push(
-    'Model calls are counted from the session trace. Token counts come from ' +
+    'Billable units come from the org\'s own metering, which is what Flex ' +
+      'Credits charge for. A change can cut tokens and still raise the bill by ' +
+      'adding actions, so the units lead and the tokens follow. No price is ' +
+      'given unless you supply the rates, because a rate depends on your ' +
+      'contract. ' +
+      'Model calls are counted from the session trace. Token counts come from ' +
       'the org\'s own metering, which lands hours after the trace does, so a ' +
       'recent pattern reads "not yet" rather than zero. No money figure is ' +
       'given, because the rate depends on the contract and an estimate would ' +

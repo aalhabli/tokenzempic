@@ -13,6 +13,8 @@ function session(partial: Partial<SessionRecord> & { sessionId: string }): Sessi
     params: {},
     outcome: 'resolved',
     credits: null,
+    billableUnits: {},
+    billableTotal: 0,
     tokens: null,
     intents: [],
     scores: { 'Relevance Score': '5' },
@@ -109,6 +111,24 @@ describe('clusterSessions', () => {
   it('still leaves a topic that never acts to the agent', () => {
     const tail = clusters.find((c) => c.signature.startsWith('general_support'));
     expect(tail?.actions).toEqual([]);
+  });
+
+  it('adds up billable units by kind, and skips rows the org does not bill', () => {
+    const billed = clusterSessions([
+      session({ sessionId: 'U1',
+        billableUnits: { EinsteinAI_Standard: 9, INTERACTION: 2, ACTION: 1 },
+        billableTotal: 12 }),
+      session({ sessionId: 'U2',
+        billableUnits: { EinsteinAI_Standard: 7, INTERACTION: 1, ACTION: 3 },
+        billableTotal: 11 }),
+    ]);
+    expect(billed[0].billableUnits).toEqual({
+      EinsteinAI_Standard: 16,
+      INTERACTION: 3,
+      ACTION: 4,
+    });
+    expect(billed[0].billableTotal).toBe(23);
+    expect(billed[0].billablePerSession).toBe(11.5);
   });
 
   it('sums tokens when metering has caught up, and reports null before', () => {

@@ -6,6 +6,8 @@ function session(partial: Partial<SessionRecord> & { sessionId: string }): Sessi
   return {
     startedAt: '2026-08-02T11:53:16Z',
     utterances: [],
+    responses: [],
+    turns: 1,
     topic: 'order_status',
     actionSequence: ['Get_Order_Status'],
     params: {},
@@ -61,9 +63,9 @@ describe('clusterSessions', () => {
     expect(clusters[0].verdict).toBe('distillable');
   });
 
-  it('will not compile a pattern that ran no actions', () => {
-    const tail = clusters.find((c) => c.signature === 'general_support');
-    expect(tail?.verdict).toBe('no-actions');
+  it('will not call one action-less session a pattern', () => {
+    const tail = clusters.find((c) => c.signature.startsWith('general_support'));
+    expect(tail?.verdict).toBe('too-few');
   });
 
   it('will not call a single session a pattern', () => {
@@ -105,8 +107,8 @@ describe('clusterSessions', () => {
   });
 
   it('still leaves a topic that never acts to the agent', () => {
-    const tail = clusters.find((c) => c.signature === 'general_support');
-    expect(tail?.verdict).toBe('no-actions');
+    const tail = clusters.find((c) => c.signature.startsWith('general_support'));
+    expect(tail?.actions).toEqual([]);
   });
 
   it('sums tokens when metering has caught up, and reports null before', () => {
@@ -116,6 +118,63 @@ describe('clusterSessions', () => {
     ]);
     expect(metered[0].tokens).toBe(18000);
     expect(clusters[0].tokens).toBeNull();
+  });
+
+  it('splits an action-less topic by the question, not into one lump', () => {
+    const help = clusterSessions([
+      session({ sessionId: 'H1', topic: 'general_support', actionSequence: [],
+        intents: ['My espresso tastes bitter lately, and I need advice on how to fix it.'],
+        responses: ['Try a coarser grind and a shorter brew time.'] }),
+      session({ sessionId: 'H2', topic: 'general_support', actionSequence: [],
+        intents: ['My espresso tastes bitter lately and I need advice to fix it.'],
+        responses: ['Try a coarser grind and a shorter brew time.'] }),
+      session({ sessionId: 'H3', topic: 'general_support', actionSequence: [],
+        intents: ['Which roast works best in a moka pot?'],
+        responses: ['A medium or dark roast suits a moka pot.'] }),
+      session({ sessionId: 'H4', topic: 'general_support', actionSequence: [],
+        intents: ['Which roast is best for a moka pot?'],
+        responses: ['Medium or dark roast works best in a moka pot.'] }),
+    ]);
+    expect(help).toHaveLength(2);
+    expect(help.every((c) => c.sessionCount === 2)).toBe(true);
+  });
+
+  it('tells a repeated question with one answer to be written down', () => {
+    const stable = clusterSessions([
+      session({ sessionId: 'S1', actionSequence: [], topic: 'general_support',
+        intents: ['My espresso tastes bitter.'],
+        responses: ['Try a coarser grind, a shorter brew time, and cooler water.'] }),
+      session({ sessionId: 'S2', actionSequence: [], topic: 'general_support',
+        intents: ['My espresso tastes bitter.'],
+        responses: ['Try a coarser grind, a shorter brew time, and cooler water today.'] }),
+    ]);
+    expect(stable[0].answerStability).toBeGreaterThan(0.8);
+    expect(stable[0].verdict).toBe('static-answer');
+  });
+
+  it('leaves a repeated question with varied answers to the agent', () => {
+    const varied = clusterSessions([
+      session({ sessionId: 'V1', actionSequence: [], topic: 'general_support',
+        intents: ['I have a complaint.'],
+        responses: ['I am sorry to hear that, tell me about the roast date.'] }),
+      session({ sessionId: 'V2', actionSequence: [], topic: 'general_support',
+        intents: ['I have a complaint.'],
+        responses: ['Please send a photograph of the packaging so we can help.'] }),
+    ]);
+    expect(varied[0].verdict).toBe('no-actions');
+  });
+
+  it('ranks by turns rather than by session count', () => {
+    const ranked = clusterSessions([
+      session({ sessionId: 'A1', topic: 'short', turns: 1 }),
+      session({ sessionId: 'A2', topic: 'short', turns: 1 }),
+      session({ sessionId: 'A3', topic: 'short', turns: 1 }),
+      session({ sessionId: 'B1', topic: 'long', turns: 4 }),
+      session({ sessionId: 'B2', topic: 'long', turns: 4 }),
+    ]);
+    expect(ranked[0].topic).toBe('long');
+    expect(ranked[0].turns).toBe(8);
+    expect(ranked[0].turnsPerSession).toBe(4);
   });
 
   it('counts only distillable sessions as reducible', () => {

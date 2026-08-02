@@ -7,6 +7,8 @@ function session(partial: Partial<SessionRecord> & { sessionId: string }): Sessi
   return {
     startedAt: '2026-08-02T11:53:16Z',
     utterances: [],
+    responses: [],
+    turns: 1,
     topic: 'order_status',
     actionSequence: ['Get_Order_Status'],
     params: {},
@@ -21,6 +23,8 @@ function session(partial: Partial<SessionRecord> & { sessionId: string }): Sessi
   };
 }
 
+// Covers each verdict the report can print: a repeated pattern that acts, an
+// action-less pattern whose answers differ, and a pattern seen only once.
 const clusters = clusterSessions([
   session({ sessionId: 'S1', intents: ['Where is my order?'] }),
   session({ sessionId: 'S2', intents: ['Has my order shipped?'] }),
@@ -28,8 +32,23 @@ const clusters = clusterSessions([
     sessionId: 'S3',
     topic: 'general_support',
     actionSequence: [],
-    intents: ['My espresso tastes bitter.'],
+    intents: ['I have a complaint about my last bag.'],
+    responses: ['I am sorry to hear that. Tell me the roast date on the bag.'],
     modelCalls: 4,
+  }),
+  session({
+    sessionId: 'S4',
+    topic: 'general_support',
+    actionSequence: [],
+    intents: ['I have a complaint about my last bag.'],
+    responses: ['Please send a photograph of the packaging so we can replace it.'],
+    modelCalls: 4,
+  }),
+  session({
+    sessionId: 'S5',
+    topic: 'returns_refunds',
+    actionSequence: ['Get_Return_Policy'],
+    intents: ['What is your return policy?'],
   }),
 ]);
 
@@ -40,8 +59,8 @@ const report = renderMarkdownReport(clusters, {
 
 describe('renderMarkdownReport', () => {
   it('leads with the counts a reader wants first', () => {
-    expect(report).toContain('3 sessions fall into 2 patterns');
-    expect(report).toContain('10 model calls');
+    expect(report).toContain('5 sessions fall into 3 patterns');
+    expect(report).toContain('17 model calls');
   });
 
   it('says what compiling would remove without claiming the session is free', () => {
@@ -57,7 +76,7 @@ describe('renderMarkdownReport', () => {
   it('gives every cluster a verdict and a reason', () => {
     expect(report).toContain('**Compile this.**');
     expect(report).toContain('**Leave it to the agent.**');
-    expect(report).toContain('There is no deterministic path to compile to.');
+    expect(report).toContain('Real judgement work.');
   });
 
   it('never quotes a token count or a money figure', () => {
@@ -98,7 +117,7 @@ describe('renderMarkdownReport', () => {
   });
 
   it('writes a clean table row', () => {
-    expect(report).toContain('| 2 | order_status > get_order_status | Get_Order_Status |');
+    expect(report).toContain('| 2 | 1 | order_status > get_order_status | Get_Order_Status |');
   });
 
   it('does not say "1 sessions"', () => {
@@ -128,7 +147,7 @@ describe('renderMarkdownReport', () => {
     // an escape of its own.
     expect(row).toContain('a\\\\\\|b');
     // Seven cells still, counting only the pipes no backslash escapes.
-    expect(row?.match(/(?<!\\)(?:\\\\)*\|/g)).toHaveLength(8);
+    expect(row?.match(/(?<!\\)(?:\\\\)*\|/g)).toHaveLength(9);
   });
 
   it('keeps a newline from ending the row', () => {

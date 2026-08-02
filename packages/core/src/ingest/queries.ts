@@ -11,7 +11,10 @@ import type {
   DataCloudQuery,
   InteractionRow,
   MessageRow,
+  MomentInteractionRow,
+  MomentRow,
   RawTrace,
+  ScoreRow,
   SessionRow,
   StepRow,
   UsageRow,
@@ -101,19 +104,67 @@ export function usageSql(since: Date, limit: number): string {
   ].join(' ');
 }
 
+export function momentSql(since: Date, limit: number): string {
+  return [
+    'SELECT ssot__Id__c, ssot__AiAgentSessionId__c, ssot__RequestSummaryText__c,',
+    '       ssot__ResponseSummaryText__c, ssot__StartTimestamp__c',
+    'FROM ssot__AiAgentMoment__dlm',
+    `WHERE ssot__StartTimestamp__c >= ${timestampLiteral(since)}`,
+    'ORDER BY ssot__StartTimestamp__c ASC',
+    `LIMIT ${limit}`,
+  ].join(' ');
+}
+
+export function momentInteractionSql(since: Date, limit: number): string {
+  return [
+    'SELECT ssot__AiAgentMomentId__c, ssot__AiAgentInteractionId__c',
+    'FROM ssot__AiAgentMomentInteraction__dlm',
+    `WHERE ssot__StartTimestamp__c >= ${timestampLiteral(since)}`,
+    `LIMIT ${limit}`,
+  ].join(' ');
+}
+
+/**
+ * Optimization scores need three tables: the association says which session or
+ * moment was tagged, the tag carries the value, and the definition names it.
+ * The join is done in Data Cloud because the association alone is meaningless.
+ *
+ * The window filters on when the score was written, not when the session ran.
+ * `AiAgentSessionStartTimestamp__c` is on the association but arrives null, and
+ * a score is always written after the session it describes, so filtering on the
+ * association's own created date can only bring in extra rows. Those drop out
+ * when the scores are joined back to the sessions in the window.
+ */
+export function scoreSql(since: Date, limit: number): string {
+  return [
+    'SELECT a.ssot__AiAgentSessionId__c, a.ssot__AiAgentMomentId__c,',
+    '       d.ssot__Name__c, t.ssot__Value__c',
+    'FROM ssot__AiAgentTagAssociation__dlm a',
+    'JOIN ssot__AiAgentTag__dlm t ON a.ssot__AiAgentTagId__c = t.ssot__Id__c',
+    'JOIN ssot__AiAgentTagDefinition__dlm d',
+    '  ON t.ssot__AiAgentTagDefinitionId__c = d.ssot__Id__c',
+    `WHERE a.ssot__CreatedDate__c >= ${timestampLiteral(since)}`,
+    `LIMIT ${limit}`,
+  ].join(' ');
+}
+
 /** Reads every table for one time window. */
 export async function readRawTrace(
   query: DataCloudQuery,
   since: Date,
   limit = 5000
 ): Promise<RawTrace> {
-  const [sessions, interactions, steps, messages, usage] = await Promise.all([
-    query(sessionSql(since, limit)),
-    query(interactionSql(since, limit)),
-    query(stepSql(since, limit)),
-    query(messageSql(since, limit)),
-    query(usageSql(since, limit)),
-  ]);
+  const [sessions, interactions, steps, messages, usage, moments, momentInteractions, scores] =
+    await Promise.all([
+      query(sessionSql(since, limit)),
+      query(interactionSql(since, limit)),
+      query(stepSql(since, limit)),
+      query(messageSql(since, limit)),
+      query(usageSql(since, limit)),
+      query(momentSql(since, limit)),
+      query(momentInteractionSql(since, limit)),
+      query(scoreSql(since, limit)),
+    ]);
 
   return {
     sessions: sessions.map(
@@ -170,5 +221,30 @@ export async function readRawTrace(
         toolName: str(r.AiAgentToolName__c),
       })
     ),
+    moments: moments.map(
+      (r): MomentRow => ({
+        id: str(r.ssot__Id__c) ?? '',
+        sessionId: str(r.ssot__AiAgentSessionId__c) ?? '',
+        requestSummary: str(r.ssot__RequestSummaryText__c),
+        responseSummary: str(r.ssot__ResponseSummaryText__c),
+        startedAt: str(r.ssot__StartTimestamp__c),
+      })
+    ),
+    momentInteractions: momentInteractions.map(
+      (r): MomentInteractionRow => ({
+        momentId: str(r.ssot__AiAgentMomentId__c) ?? '',
+        interactionId: str(r.ssot__AiAgentInteractionId__c) ?? '',
+      })
+    ),
+    scores: scores
+      .map(
+        (r): ScoreRow => ({
+          sessionId: str(r.ssot__AiAgentSessionId__c) ?? '',
+          momentId: str(r.ssot__AiAgentMomentId__c),
+          name: str(r.ssot__Name__c) ?? '',
+          value: str(r.ssot__Value__c) ?? '',
+        })
+      )
+      .filter((r) => r.name !== '' && r.value !== ''),
   };
 }

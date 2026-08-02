@@ -122,6 +122,30 @@ const raw: RawTrace = {
       sentAt: '2026-08-02T11:53:24Z',
     },
   ],
+  moments: [
+    {
+      id: 'MO1',
+      sessionId: 'S1',
+      requestSummary: 'I want to know if my order has shipped.',
+      responseSummary: 'The agent said the order was delivered.',
+      startedAt: '2026-08-02T11:53:16Z',
+    },
+    {
+      id: 'MO2',
+      sessionId: 'S2',
+      requestSummary: 'I want to know when my order will arrive.',
+      responseSummary: 'The agent said the order was delivered.',
+      startedAt: '2026-08-02T11:53:24Z',
+    },
+  ],
+  momentInteractions: [
+    { momentId: 'MO1', interactionId: 'I2' },
+    { momentId: 'MO2', interactionId: 'I3' },
+  ],
+  scores: [
+    { sessionId: 'S1', momentId: 'MO1', name: 'Relevance Score', value: '5' },
+    { sessionId: 'S1', momentId: null, name: 'Quality Score', value: '4' },
+  ],
   usage: [
     {
       sessionId: 'S1',
@@ -202,6 +226,41 @@ describe('normalizeSessions', () => {
   it('reads the outcome from the terminal step, not the session row', () => {
     expect(records[0].outcome).toBe('resolved');
     expect(records[1].outcome).toBe('unknown');
+  });
+});
+
+describe('Optimization moments and scores', () => {
+  const records = normalizeSessions(raw);
+
+  it('takes the intent Salesforce already worked out', () => {
+    expect(records[0].intents).toEqual(['I want to know if my order has shipped.']);
+    expect(records[1].intents).toEqual(['I want to know when my order will arrive.']);
+  });
+
+  it('gives two different intents one action signature', () => {
+    expect(records[0].intents).not.toEqual(records[1].intents);
+    expect(records[0].actionSequence).toEqual(records[1].actionSequence);
+  });
+
+  it('keeps the scores the org wrote, keyed by name', () => {
+    expect(records[0].scores).toEqual({ 'Relevance Score': '5', 'Quality Score': '4' });
+  });
+
+  it('leaves a score absent rather than zero when the org wrote none', () => {
+    expect(records[1].scores).toEqual({});
+  });
+
+  it('counts the steps that invoke a model', () => {
+    // S1 runs TOPIC_STEP and CLASSIFIER_STEP and LLM_STEP. ACTION_STEP and
+    // SESSION_END are free.
+    expect(records[0].modelCalls).toBe(3);
+    expect(records[0].stepCounts.ACTION_STEP).toBe(1);
+    expect(records[0].stepCounts.SESSION_END).toBe(1);
+  });
+
+  it('does not count an action as a model call', () => {
+    expect(records[1].modelCalls).toBe(0);
+    expect(records[1].stepCounts.ACTION_STEP).toBe(1);
   });
 });
 

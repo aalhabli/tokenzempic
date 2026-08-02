@@ -9,7 +9,7 @@
 
 import type { SessionRecord } from '../types.js';
 import type { MessageRow, RawTrace, StepRow, UsageRow } from './types.js';
-import { MessageType, StepType } from './vocabulary.js';
+import { BILLABLE_STEP_TYPES, MessageType, StepType } from './vocabulary.js';
 
 export interface NormalizeOptions {
   /** True when a message came from the person, not the agent. */
@@ -100,6 +100,8 @@ export function normalizeSessions(
   const stepsByInteraction = groupBy(raw.steps, (r) => r.interactionId);
   const messagesBySession = groupBy(raw.messages, (r) => r.sessionId);
   const usageBySession = groupBy(raw.usage, (r) => r.sessionId);
+  const momentsBySession = groupBy(raw.moments, (r) => r.sessionId);
+  const scoresBySession = groupBy(raw.scores, (r) => r.sessionId);
 
   return raw.sessions.map((session) => {
     const interactions = (interactionsBySession.get(session.id) ?? []).slice().sort(byTime);
@@ -127,6 +129,30 @@ export function normalizeSessions(
     const endReason =
       steps.find((s) => s.stepType === StepType.SessionEnd)?.name ?? session.endType;
 
+    const stepCounts: Record<string, number> = {};
+    for (const s of steps) {
+      if (!s.stepType) continue;
+      stepCounts[s.stepType] = (stepCounts[s.stepType] ?? 0) + 1;
+    }
+    const modelCalls = BILLABLE_STEP_TYPES.reduce(
+      (total, type) => total + (stepCounts[type] ?? 0),
+      0
+    );
+
+    const intents = (momentsBySession.get(session.id) ?? [])
+      .slice()
+      .sort((a, b) => (a.startedAt ?? '').localeCompare(b.startedAt ?? ''))
+      .map((m) => m.requestSummary)
+      .filter((t): t is string => Boolean(t))
+      .map(decodeEntities);
+
+    // Last write wins. An org can score the same session more than once, and
+    // the newer value is the one worth reporting.
+    const scores: Record<string, string> = {};
+    for (const s of scoresBySession.get(session.id) ?? []) {
+      scores[s.name] = s.value;
+    }
+
     return {
       sessionId: session.id,
       startedAt: session.startedAt ?? '',
@@ -136,6 +162,10 @@ export function normalizeSessions(
       params: parseParams(actionSteps),
       outcome: outcomeFrom(endReason),
       credits: creditsFor(usageBySession.get(session.id) ?? []),
+      intents,
+      scores,
+      stepCounts,
+      modelCalls,
     };
   });
 }

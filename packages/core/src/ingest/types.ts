@@ -1,0 +1,86 @@
+/**
+ * Row shapes for the Agentforce session-tracing DMOs in Data Cloud, and the
+ * query port that core needs to read them.
+ *
+ * Core never opens a connection of its own. The caller passes in a function
+ * that runs one SQL statement against the org's Data Cloud query API and hands
+ * back the rows. That keeps this package testable and keeps every outbound
+ * call in the CLI, where the user can see it.
+ */
+
+/** A single row, keyed by the DMO column name. */
+export type DmoRow = Record<string, string | number | boolean | null>;
+
+/** Runs one Data Cloud SQL statement and returns its rows. */
+export type DataCloudQuery = (sql: string) => Promise<DmoRow[]>;
+
+/** ssot__AiAgentSession__dlm — one conversation. */
+export interface SessionRow {
+  id: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  endType: string | null;
+}
+
+/** ssot__AiAgentInteraction__dlm — one turn inside a conversation. */
+export interface InteractionRow {
+  id: string;
+  sessionId: string;
+  topicApiName: string | null;
+  startedAt: string | null;
+  interactionType: string | null;
+}
+
+/**
+ * ssot__AiAgentInteractionStep__dlm — one step inside a turn: a reasoning
+ * call, an action invocation, an error. This is the table the whole tool
+ * turns on, because the ordered action names are the clustering signature.
+ */
+export interface StepRow {
+  id: string;
+  interactionId: string;
+  name: string | null;
+  stepType: string | null;
+  subType: string | null;
+  inputValue: string | null;
+  outputValue: string | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+}
+
+/** ssot__AiAgentInteractionMessage__dlm — what was said, by whom. */
+export interface MessageRow {
+  id: string;
+  sessionId: string;
+  interactionId: string | null;
+  messageType: string | null;
+  content: string | null;
+  sentAt: string | null;
+}
+
+/**
+ * AiAgentGenerativeAiUsage_std__dlm — token and credit consumption.
+ * `isBillable` matters: it is the difference between a claim we can make and
+ * a claim we cannot.
+ */
+export interface UsageRow {
+  sessionId: string;
+  interactionId: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  usageQuantity: number | null;
+  isBillable: boolean | null;
+  isMetered: boolean | null;
+  modelName: string | null;
+  toolName: string | null;
+}
+
+/** Everything read for one time window, before it is folded into records. */
+export interface RawTrace {
+  sessions: SessionRow[];
+  interactions: InteractionRow[];
+  steps: StepRow[];
+  messages: MessageRow[];
+  usage: UsageRow[];
+}

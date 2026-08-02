@@ -91,9 +91,9 @@ describe('clusterSessions', () => {
     expect(unscored[0].verdict).toBe('unscored');
   });
 
-  it('calls a no-action cluster stalled when the topic acts elsewhere', () => {
-    // Order status reaches its action in three sessions and never reaches it
-    // in two. The two are a stall, not work worth leaving to the agent.
+  it('flags a no-action cluster as inconsistent when the topic acts elsewhere', () => {
+    // Order status reaches its action in three sessions and not in two. Say
+    // that, and do not guess why.
     const mixed = clusterSessions([
       session({ sessionId: 'A1' }),
       session({ sessionId: 'A2' }),
@@ -103,7 +103,7 @@ describe('clusterSessions', () => {
     ]);
     const stalled = mixed.find((c) => c.signature === 'order_status');
     expect(stalled?.sessionCount).toBe(2);
-    expect(stalled?.verdict).toBe('stalled');
+    expect(stalled?.verdict).toBe('inconsistent');
   });
 
   it('still leaves a topic that never acts to the agent', () => {
@@ -137,6 +137,29 @@ describe('clusterSessions', () => {
     ]);
     expect(help).toHaveLength(2);
     expect(help.every((c) => c.sessionCount === 2)).toBe(true);
+  });
+
+  it('scores stability on the final answer, not on the welcome message', () => {
+    // Every session opens with the same greeting. Counting it measured the
+    // greeting rather than the answer.
+    const greeting = 'Hi, I am the Nimbus Coffee assistant. How can I help you?';
+    const withGreeting = clusterSessions([
+      session({ sessionId: 'G1', actionSequence: [], topic: 'general_support',
+        intents: ['Where do you roast?'],
+        responses: [greeting, 'We roast every batch in Bristol on Tuesdays.'] }),
+      session({ sessionId: 'G2', actionSequence: [], topic: 'general_support',
+        intents: ['Where do you roast?'],
+        responses: [greeting, 'Our roastery is in Bristol and we roast on Tuesdays.'] }),
+    ]);
+    const answersOnly = clusterSessions([
+      session({ sessionId: 'G3', actionSequence: [], topic: 'general_support',
+        intents: ['Where do you roast?'],
+        responses: ['We roast every batch in Bristol on Tuesdays.'] }),
+      session({ sessionId: 'G4', actionSequence: [], topic: 'general_support',
+        intents: ['Where do you roast?'],
+        responses: ['Our roastery is in Bristol and we roast on Tuesdays.'] }),
+    ]);
+    expect(withGreeting[0].answerStability).toBe(answersOnly[0].answerStability);
   });
 
   it('tells a repeated question with one answer to be written down', () => {

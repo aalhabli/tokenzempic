@@ -27,11 +27,12 @@ export type Distillability =
   /** No actions ran, and the answers differ every time. Real judgement work. */
   | 'no-actions'
   /**
-   * The agent recognised the intent and never reached the action, while other
-   * sessions on the same topic did. These cost tokens and resolve nothing, so
-   * the fix is the agent's inputs, not generated code.
+   * Other sessions on this topic reach an action and these do not. The trace
+   * does not say why, so this states the observation rather than the cause:
+   * the agent may stall asking for input it could already have, or it may
+   * answer another way. Both are worth reading before anything is generated.
    */
-  | 'stalled'
+  | 'inconsistent'
   /** Too few sessions to call it a pattern. */
   | 'too-few';
 
@@ -167,7 +168,13 @@ export function clusterSessions(
       const tokenTotal = part.reduce((n, s) => n + (s.tokens ?? 0), 0);
       const turns = part.reduce((n, s) => n + s.turns, 0);
       const quality = meanScore(part, opts.qualityTagName);
-      const answerStability = stability(part.flatMap((s) => s.responses));
+      // Only the last reply of each session. Every session opens with the same
+      // welcome message, and comparing greetings to answers measured the
+      // greeting. Switching to the final answer moved one real cluster from
+      // 0.34 to 0.58 against a traced org.
+      const answerStability = stability(
+        part.map((s) => s.responses[s.responses.length - 1] ?? '')
+      );
 
       // Name a split cluster after the question, so the report does not show
       // five rows all called general_support.
@@ -196,15 +203,17 @@ export function clusterSessions(
   }
 
   // A cluster that ran no actions is only agent-worthy work if nothing on that
-  // topic ever reaches an action. When a sibling cluster does, the agent knew
-  // what was wanted and never got there, which is a stall and not a judgement
-  // call. Telling a reader to "leave it to the agent" would be wrong.
+  // topic ever reaches an action. When a sibling cluster does, something is
+  // inconsistent. Do not name the cause: an earlier version called this a
+  // stall, and then produced false positives on sessions that answered
+  // correctly from knowledge instead of calling a Flow.
   const topicsThatAct = new Set(
     clusters.filter((c) => c.actions.length > 0).map((c) => c.topic)
   );
   for (const c of clusters) {
-    if (c.verdict === 'no-actions' && c.topic !== null && topicsThatAct.has(c.topic)) {
-      c.verdict = 'stalled';
+    const unresolved = c.verdict === 'no-actions' || c.verdict === 'static-answer';
+    if (unresolved && c.topic !== null && topicsThatAct.has(c.topic)) {
+      c.verdict = 'inconsistent';
     }
   }
 

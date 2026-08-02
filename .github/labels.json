@@ -12,7 +12,6 @@
   { "name": "area:codegen", "color": "1d76db", "description": "Apex generation and the parity tests" },
   { "name": "area:github", "color": "1d76db", "description": "Branch, commit, and pull request automation" },
   { "name": "area:tui", "color": "1d76db", "description": "The terminal dashboard" },
-  { "name": "area:demo", "color": "1d76db", "description": "The demo org and its seed data" },
   { "name": "area:docs", "color": "1d76db", "description": "Documentation and process files" },
   { "name": "area:ci", "color": "1d76db", "description": "Workflows, tooling, and releases" },
 

@@ -27,11 +27,13 @@ Salesforce's own architecture guide calls using an agent for repeatable work an 
 
 ## What your org needs
 
-tokenzempic reads the session traces that Agentforce writes to Data Cloud. An
-org that does not write them has nothing for the tool to read. Turn on tracing
-before you install anything.
+Point tokenzempic at the org where your agent already runs: a sandbox, or
+production. It reads the session traces that Agentforce writes to Data Cloud,
+and an org that does not write them has nothing for the tool to read.
 
-1. Provision **Data Cloud**. The session-tracing objects live there.
+Turn tracing on before you install anything:
+
+1. Provision **Data Cloud** in that org. The session-tracing objects live there.
 2. Go to Setup, then **Einstein Audit, Analytics, and Monitoring Setup**.
 3. Set **Data Space**. The audit APIs fail until an org selects one.
 4. Turn on **Audit and Feedback**.
@@ -48,19 +50,25 @@ Step 5 provisions these data model objects:
 | `ssot__AiAgentInteractionMessage__dlm` | What the person and the agent said |
 | `AiAgentGenerativeAiUsage_std__dlm` | Token counts and billable usage |
 
-Tracing applies to sessions that start after you turn it on. Earlier
-conversations are not backfilled.
+Two things to know before you plan around this:
 
-To confirm that the traces arrive, have one conversation, wait about five
-minutes, then run:
+- Tracing applies to sessions that start after you turn it on. Your existing
+  conversation history is not backfilled, so the first useful report comes
+  after your agent has run for a while under tracing.
+- A sandbox refresh drops the traces with everything else. Turn tracing on
+  again after a refresh.
+
+To confirm that traces arrive, have one conversation, wait a few minutes, then
+run:
 
 ```bash
 echo '{"sql":"SELECT ssot__Id__c FROM ssot__AiAgentSession__dlm LIMIT 10"}' \
   | sf api request rest "/services/data/v67.0/ssot/queryv2" --method POST -b - -o <your-org>
 ```
 
-Measured in a Developer Edition org: sessions, turns, steps, and messages
-appear about three to five minutes after the conversation ends.
+Sessions, turns, steps, and messages showed up about three to five minutes
+after a conversation ended in the org this was measured in. Treat that as the
+order of magnitude, not a guarantee.
 
 ## Privacy
 

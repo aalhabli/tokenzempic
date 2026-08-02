@@ -1,35 +1,63 @@
 # tokenzempic
 
-<!-- ste:off -->
+An `sf` CLI plugin that reads Agentforce session traces and reports what your
+agent's conversation patterns cost, in the units Salesforce bills you for.
 
-*Put your Salesforce Agentforce agents on a zero token diet.*
+Agentforce records what an agent did, turn by turn, in Data Cloud. Nothing reads
+those traces and tells you which conversations cost more than they need to.
+That is the gap this fills.
 
-Your Agentforce agent answered the same question 400 times last month. You paid it to think, every time.
+## What it does
 
-tokenzempic is an `sf` CLI plugin that reads your agent's session traces — the diary Salesforce already keeps — finds what the agent does repeatedly, and opens a GitHub PR that replaces the repeats with plain Apex and Flows. The PR comes with parity tests that replay real sessions to prove the new logic does what the agent did. Anything the deterministic path doesn't recognize falls back to the agent, so nothing breaks on day one.
+It reads the session traces, groups the sessions by what the agent did and by
+what people asked for, and reports each pattern with its volume, its turn count,
+and its cost. Then it says which patterns look reducible, and why.
 
-Salesforce's own architecture guide calls using an agent for repeatable work an anti-pattern. This is the cleanup tool.
+It spends nothing to do this. Grouping is string comparison, and the intent
+labels come from Agentforce Optimization, which already writes them for every
+session. No model reads your traces.
 
-## How it works
+## What we measured
 
-1. `sf tokenzempic study` pulls session traces and clusters them by what the agent *did*, not what users said. Clustering is plain code plus embeddings — no model reads your logs.
-2. `sf tokenzempic report` shows what your agent does all day and what each slice costs.
-3. `sf tokenzempic compile` writes Apex for the biggest cluster, generates parity tests, and opens a PR. A human reviews the diff. Nothing deploys on its own.
-4. Repeat. Every merge moves more traffic off the meter.
+Every figure below comes from one Developer Edition org running a seeded
+corpus. Your org will differ. They are here because the design rests on them,
+not as a promise about your numbers.
 
-## Honest numbers
+**Cost is close to linear in the number of customer messages.** One message
+costs exactly one billable interaction, plus about six model-call units.
+Measured across 334 sessions, with no exception. So a three-message exchange
+costs roughly three times a one-message exchange.
 
-- Agents with structured triggers (record-triggered, button-invoked): genuinely zero tokens after conversion.
-- Conversational agents: one cheap classifier call replaces a 5–15 call reasoning loop. Roughly 90% fewer tokens, and everything after intent capture is deterministic.
-- The agent keeps the genuinely new stuff. That's the only part worth paying per-token for.
+**A turn cannot be made free.** Any turn that reaches a subagent costs at least
+three model calls: the router, a guardrail, and the subagent's own reasoning.
+Agent Script has no statement that ends a turn or answers without entering the
+reasoning loop, so no amount of generated code removes that floor.
 
-<!-- ste:on -->
+**Turns are the only lever that moved.** On one intent, removing a single turn
+cut tokens by 36% and billable units by 29%. The agent also resolved more
+sessions, not fewer.
+
+**The prompt is mostly not yours.** Input is 98% of token spend, and about 74%
+of a subagent's prompt is Salesforce system text you cannot edit. Shortening
+your own instructions changes little.
+
+## What it does not do
+
+It does not make an agent free, and it will not tell you it can.
+
+It does not generate code yet. Reading and reporting work; the part that
+proposes a change is not built.
+
+It does not replace Agentforce Optimization. Optimization scores conversation
+quality and groups moments by intent. It never links an intent to the actions
+that served it. That join is what this tool adds, so the two work better
+together than apart.
 
 ## What your org needs
 
 Point tokenzempic at the org where your agent already runs: a sandbox, or
-production. It reads the session traces that Agentforce writes to Data Cloud,
-and an org that does not write them has nothing for the tool to read.
+production. It reads the session traces that Agentforce writes to Data Cloud.
+An org that does not write them has nothing for the tool to read.
 
 Turn tracing on before you install anything:
 
@@ -50,13 +78,17 @@ Step 5 provisions these data model objects:
 | `ssot__AiAgentInteractionMessage__dlm` | What the person and the agent said |
 | `AiAgentGenerativeAiUsage_std__dlm` | Token counts and billable usage |
 
-Two things to know before you plan around this:
+Three things to know before you plan around this:
 
 - Tracing applies to sessions that start after you turn it on. Your existing
   conversation history is not backfilled, so the first useful report comes
   after your agent has run for a while under tracing.
 - A sandbox refresh drops the traces with everything else. Turn tracing on
   again after a refresh.
+- Three clocks run at different speeds. Traces arrive in minutes, the
+  Optimization intent labels and scores in tens of minutes, and the billing
+  figures in hours. A report run straight after a conversation shows the shape
+  but not the cost.
 
 To confirm that traces arrive, have one conversation, wait a few minutes, then
 run:
@@ -72,11 +104,14 @@ order of magnitude, not a guarantee.
 
 ## Privacy
 
-tokenzempic runs on your machine. It reads your org through the supported Salesforce APIs. Your session logs stay in your infrastructure. You bring your own LLM key for the small parts that need one.
+tokenzempic runs on your machine. It reads your org through the supported
+Salesforce APIs. Your session traces stay in your infrastructure.
 
 ## Status
 
-Early. There is nothing to install yet. Version 0.1 is the read-only agent audit, and it is in progress. Watch the repository to see when it lands.
+Early, and there is nothing to install yet. Reading traces, grouping them, and
+reporting cost are done. The command line and the part that proposes a change
+are not. Watch the repository to see when the first release lands.
 
 ## Contributing
 

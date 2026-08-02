@@ -60,39 +60,7 @@ echo '{"sql":"SELECT ssot__Id__c FROM ssot__AiAgentSession__dlm LIMIT 10"}' \
 ```
 
 Measured in a Developer Edition org: sessions, turns, steps, and messages
-appear about three to five minutes after the conversation ends. Plan a demo
-around that delay.
-
-## The demo org
-
-`demo/` holds the Nimbus Coffee org: the custom object, the seed script, three
-Flows, and the Nimbus agent. The agent is an Agent Script authoring bundle, so
-the whole agent is one reviewable file.
-
-Set the agent user first. Open
-`demo/force-app/main/default/aiAuthoringBundles/Nimbus/Nimbus.agent` and replace
-`AGENT_USER_PLACEHOLDER` with the username of your org's Agentforce Service
-Agent user. The repository does not carry that username, because it contains an
-org ID.
-
-```bash
-sf project deploy start -d demo/force-app -o <your-org>
-sf agent validate authoring-bundle -n Nimbus -o <your-org>
-sf agent publish authoring-bundle -n Nimbus -o <your-org>
-sf agent activate -n Nimbus --version 1 -o <your-org>
-```
-
-Publishing writes `bots/` and `genAiPlannerBundles/` into the project. Those
-files are generated, so the repository ignores them. The bundle is the source.
-
-Two things to know if you build your own agent this way:
-
-- Every action must declare at least one input. An action with no inputs fails
-  to publish.
-- A Flow that an agent calls needs `runInMode` set to
-  `SystemModeWithoutSharing`. The Agentforce Service Agent user does not get
-  internal record sharing. Without it the Flow finds no records, and the agent
-  reports that politely instead of failing.
+appear about three to five minutes after the conversation ends.
 
 ## Privacy
 

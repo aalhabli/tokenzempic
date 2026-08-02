@@ -21,6 +21,9 @@ export interface NormalizeOptions {
 const defaultIsUserMessage = (row: MessageRow): boolean =>
   row.messageType === MessageType.User;
 
+const isAgentMessage = (row: MessageRow): boolean =>
+  row.messageType === MessageType.Agent;
+
 const defaultIsActionStep = (row: StepRow): boolean =>
   row.stepType === StepType.Action;
 
@@ -118,13 +121,18 @@ export function normalizeSessions(
     }
     const actionSteps = steps.filter(isActionStep);
 
-    const utterances = (messagesBySession.get(session.id) ?? [])
+    const ordered = (messagesBySession.get(session.id) ?? [])
       .slice()
-      .sort((a, b) => (a.sentAt ?? '').localeCompare(b.sentAt ?? ''))
-      .filter(isUserMessage)
-      .map((m) => m.content)
-      .filter((c): c is string => Boolean(c))
-      .map(decodeEntities);
+      .sort((a, b) => (a.sentAt ?? '').localeCompare(b.sentAt ?? ''));
+
+    const text = (rows: MessageRow[]): string[] =>
+      rows
+        .map((m) => m.content)
+        .filter((c): c is string => Boolean(c))
+        .map(decodeEntities);
+
+    const utterances = text(ordered.filter(isUserMessage));
+    const responses = text(ordered.filter(isAgentMessage));
 
     // The first topic the router settled on is what the session is about.
     // Later turns can drift, and drift belongs in the report, not the key.
@@ -163,6 +171,8 @@ export function normalizeSessions(
       sessionId: session.id,
       startedAt: session.startedAt ?? '',
       utterances,
+      responses,
+      turns: utterances.length,
       topic,
       actionSequence: actionSteps.map((s) => s.name).filter((n): n is string => Boolean(n)),
       params: parseParams(actionSteps),

@@ -66,6 +66,12 @@ function parseParams(steps: StepRow[]): Record<string, unknown> {
   return params;
 }
 
+function tokensFor(rows: UsageRow[]): number | null {
+  const metered = rows.filter((r) => r.isMetered !== false);
+  const total = metered.reduce((sum, r) => sum + (r.totalTokens ?? 0), 0);
+  return total > 0 ? total : null;
+}
+
 function creditsFor(rows: UsageRow[]): number | null {
   const billable = rows.filter((r) => r.isBillable !== false);
   if (billable.length === 0) return null;
@@ -162,6 +168,7 @@ export function normalizeSessions(
       params: parseParams(actionSteps),
       outcome: outcomeFrom(endReason),
       credits: creditsFor(usageBySession.get(session.id) ?? []),
+      tokens: tokensFor(usageBySession.get(session.id) ?? []),
       intents,
       scores,
       stepCounts,

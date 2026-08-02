@@ -96,21 +96,25 @@ export function clusterSessions(
 
   const clusters: Cluster[] = [];
   for (const [signature, sessions] of bySignature) {
-    const actions = sessions[0].actionSequence;
+    // Every bucket was created with a session in it, so this only satisfies
+    // the compiler.
+    const first = sessions[0];
+    if (!first) continue;
+
     const modelCalls = sessions.reduce((total, s) => total + s.modelCalls, 0);
     const quality = meanScore(sessions, opts.qualityTagName);
 
     clusters.push({
       signature,
-      actions,
-      topic: sessions[0].topic,
+      actions: first.actionSequence,
+      topic: first.topic,
       sessions,
       sessionCount: sessions.length,
       intents: [...new Set(sessions.flatMap((s) => s.intents))].sort(),
       modelCalls,
       modelCallsPerSession: Math.round((modelCalls / sessions.length) * 10) / 10,
       qualityScore: quality,
-      verdict: judge(sessions.length, actions, quality, opts),
+      verdict: judge(sessions.length, first.actionSequence, quality, opts),
     });
   }
 

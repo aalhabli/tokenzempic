@@ -17,6 +17,12 @@ export interface SessionRecord {
   /** Credit/token cost of the session if the org exposes it, else null. */
   credits: number | null;
   /**
+   * Tokens the session consumed, when the org's metering has caught up. This
+   * lands hours after the trace does, so a recent session reads null and the
+   * report falls back to counting model calls.
+   */
+  tokens: number | null;
+  /**
    * What Agentforce Optimization decided the session was about, one entry per
    * moment. Salesforce writes these itself, so the tool pays nothing for an
    * intent label and gets a better one than it would derive.

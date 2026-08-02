@@ -1,5 +1,13 @@
 export type { SessionRecord } from './types.js';
 export { actionSignature } from './cluster/signature.js';
+export {
+  clusterSessions,
+  reducibleModelCalls,
+  type Cluster,
+  type ClusterOptions,
+  type Distillability,
+} from './cluster/cluster.js';
+export { renderMarkdownReport, type ReportOptions } from './report/markdown.js';
 export type {
   DataCloudQuery,
   DmoRow,

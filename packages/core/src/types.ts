@@ -21,6 +21,16 @@ export interface SessionRecord {
   /** Input parameters the agent extracted and passed to actions. */
   params: Record<string, unknown>;
   outcome: 'resolved' | 'escalated' | 'abandoned' | 'unknown';
+  /**
+   * What the org is charged for this session, keyed by the unit it meters:
+   * `EinsteinAI_Standard` for a model call, `INTERACTION` for a turn,
+   * `ACTION` for a tool the agent ran. Salesforce bills these, not tokens, so
+   * this is the number a Flex Credit org cares about. Rows the org marks as
+   * not billable are left out.
+   */
+  billableUnits: Record<string, number>;
+  /** Every billable unit added up, whatever its kind. */
+  billableTotal: number;
   /** Credit/token cost of the session if the org exposes it, else null. */
   credits: number | null;
   /**

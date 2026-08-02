@@ -75,6 +75,22 @@ function tokensFor(rows: UsageRow[]): number | null {
   return total > 0 ? total : null;
 }
 
+/**
+ * Adds up what the org will be charged, split by the unit it meters. The unit
+ * name prefers `unitType` and falls back to `usageType`, because a model call
+ * carries a usage type and no unit type.
+ */
+function billableUnitsFor(rows: UsageRow[]): Record<string, number> {
+  const units: Record<string, number> = {};
+  for (const row of rows) {
+    if (row.isBillable === false) continue;
+    const name = row.unitType ?? row.usageType;
+    if (!name) continue;
+    units[name] = (units[name] ?? 0) + (row.usageQuantity ?? 0);
+  }
+  return units;
+}
+
 function creditsFor(rows: UsageRow[]): number | null {
   const billable = rows.filter((r) => r.isBillable !== false);
   if (billable.length === 0) return null;
@@ -153,6 +169,8 @@ export function normalizeSessions(
       0
     );
 
+    const billableUnits = billableUnitsFor(usageBySession.get(session.id) ?? []);
+
     const intents = (momentsBySession.get(session.id) ?? [])
       .slice()
       .sort((a, b) => (a.startedAt ?? '').localeCompare(b.startedAt ?? ''))
@@ -177,6 +195,8 @@ export function normalizeSessions(
       actionSequence: actionSteps.map((s) => s.name).filter((n): n is string => Boolean(n)),
       params: parseParams(actionSteps),
       outcome: outcomeFrom(endReason),
+      billableUnits,
+      billableTotal: Object.values(billableUnits).reduce((n, v) => n + v, 0),
       credits: creditsFor(usageBySession.get(session.id) ?? []),
       tokens: tokensFor(usageBySession.get(session.id) ?? []),
       intents,

@@ -25,6 +25,75 @@ Salesforce's own architecture guide calls using an agent for repeatable work an 
 
 <!-- ste:on -->
 
+## What your org needs
+
+tokenzempic reads the session traces that Agentforce writes to Data Cloud. An
+org that does not write them has nothing for the tool to read. Turn on tracing
+before you install anything.
+
+1. Provision **Data Cloud**. The session-tracing objects live there.
+2. Go to Setup, then **Einstein Audit, Analytics, and Monitoring Setup**.
+3. Set **Data Space**. The audit APIs fail until an org selects one.
+4. Turn on **Audit and Feedback**.
+5. Turn on **Agentforce Session Tracing**. This also turns on Agent Platform
+   Tracing, which records each Flow and Apex action.
+
+Step 5 provisions these data model objects:
+
+| Object | Holds |
+|---|---|
+| `ssot__AiAgentSession__dlm` | One conversation |
+| `ssot__AiAgentInteraction__dlm` | One turn, and the topic the router chose |
+| `ssot__AiAgentInteractionStep__dlm` | Each step in a turn, and each action call |
+| `ssot__AiAgentInteractionMessage__dlm` | What the person and the agent said |
+| `AiAgentGenerativeAiUsage_std__dlm` | Token counts and billable usage |
+
+Tracing applies to sessions that start after you turn it on. Earlier
+conversations are not backfilled.
+
+To confirm that the traces arrive, have one conversation, wait about five
+minutes, then run:
+
+```bash
+echo '{"sql":"SELECT ssot__Id__c FROM ssot__AiAgentSession__dlm LIMIT 10"}' \
+  | sf api request rest "/services/data/v67.0/ssot/queryv2" --method POST -b - -o <your-org>
+```
+
+Measured in a Developer Edition org: sessions, turns, steps, and messages
+appear about three to five minutes after the conversation ends. Plan a demo
+around that delay.
+
+## The demo org
+
+`demo/` holds the Nimbus Coffee org: the custom object, the seed script, three
+Flows, and the Nimbus agent. The agent is an Agent Script authoring bundle, so
+the whole agent is one reviewable file.
+
+Set the agent user first. Open
+`demo/force-app/main/default/aiAuthoringBundles/Nimbus/Nimbus.agent` and replace
+`AGENT_USER_PLACEHOLDER` with the username of your org's Agentforce Service
+Agent user. The repository does not carry that username, because it contains an
+org ID.
+
+```bash
+sf project deploy start -d demo/force-app -o <your-org>
+sf agent validate authoring-bundle -n Nimbus -o <your-org>
+sf agent publish authoring-bundle -n Nimbus -o <your-org>
+sf agent activate -n Nimbus --version 1 -o <your-org>
+```
+
+Publishing writes `bots/` and `genAiPlannerBundles/` into the project. Those
+files are generated, so the repository ignores them. The bundle is the source.
+
+Two things to know if you build your own agent this way:
+
+- Every action must declare at least one input. An action with no inputs fails
+  to publish.
+- A Flow that an agent calls needs `runInMode` set to
+  `SystemModeWithoutSharing`. The Agentforce Service Agent user does not get
+  internal record sharing. Without it the Flow finds no records, and the agent
+  reports that politely instead of failing.
+
 ## Privacy
 
 tokenzempic runs on your machine. It reads your org through the supported Salesforce APIs. Your session logs stay in your infrastructure. You bring your own LLM key for the small parts that need one.

@@ -9,6 +9,11 @@ dist/
 *.tsbuildinfo
 oclif.manifest.json
 
+# agent metadata that `sf agent publish` generates from the authoring bundle.
+# It holds org-specific IDs, and the bundle is the source of truth.
+demo/force-app/main/default/bots/
+demo/force-app/main/default/genAiPlannerBundles/
+
 # local data and secrets
 *.db
 .tokenzempic/

@@ -25,6 +25,51 @@ Salesforce's own architecture guide calls using an agent for repeatable work an 
 
 <!-- ste:on -->
 
+## What your org needs
+
+Point tokenzempic at the org where your agent already runs: a sandbox, or
+production. It reads the session traces that Agentforce writes to Data Cloud,
+and an org that does not write them has nothing for the tool to read.
+
+Turn tracing on before you install anything:
+
+1. Provision **Data Cloud** in that org. The session-tracing objects live there.
+2. Go to Setup, then **Einstein Audit, Analytics, and Monitoring Setup**.
+3. Set **Data Space**. The audit APIs fail until an org selects one.
+4. Turn on **Audit and Feedback**.
+5. Turn on **Agentforce Session Tracing**. This also turns on Agent Platform
+   Tracing, which records each Flow and Apex action.
+
+Step 5 provisions these data model objects:
+
+| Object | Holds |
+|---|---|
+| `ssot__AiAgentSession__dlm` | One conversation |
+| `ssot__AiAgentInteraction__dlm` | One turn, and the topic the router chose |
+| `ssot__AiAgentInteractionStep__dlm` | Each step in a turn, and each action call |
+| `ssot__AiAgentInteractionMessage__dlm` | What the person and the agent said |
+| `AiAgentGenerativeAiUsage_std__dlm` | Token counts and billable usage |
+
+Two things to know before you plan around this:
+
+- Tracing applies to sessions that start after you turn it on. Your existing
+  conversation history is not backfilled, so the first useful report comes
+  after your agent has run for a while under tracing.
+- A sandbox refresh drops the traces with everything else. Turn tracing on
+  again after a refresh.
+
+To confirm that traces arrive, have one conversation, wait a few minutes, then
+run:
+
+```bash
+echo '{"sql":"SELECT ssot__Id__c FROM ssot__AiAgentSession__dlm LIMIT 10"}' \
+  | sf api request rest "/services/data/v67.0/ssot/queryv2" --method POST -b - -o <your-org>
+```
+
+Sessions, turns, steps, and messages showed up about three to five minutes
+after a conversation ended in the org this was measured in. Treat that as the
+order of magnitude, not a guarantee.
+
 ## Privacy
 
 tokenzempic runs on your machine. It reads your org through the supported Salesforce APIs. Your session logs stay in your infrastructure. You bring your own LLM key for the small parts that need one.

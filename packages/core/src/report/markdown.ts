@@ -19,7 +19,7 @@ const VERDICT_TEXT: Record<Distillability, string> = {
   'poor-quality': 'Fix the agent first',
   'static-answer': 'Write it down once',
   'no-actions': 'Leave it to the agent',
-  stalled: 'Fix the agent, not the code',
+  inconsistent: 'Sometimes acts, sometimes not',
   'too-few': 'Not yet a pattern',
 };
 
@@ -32,10 +32,10 @@ const VERDICT_WHY: Record<Distillability, string> = {
     'time. It calls nothing, so there is nothing to speed up, only something to ' +
     'stop regenerating. A knowledge article or a screen flow ends it.',
   'no-actions': 'The agent only reasoned, and its answers differ each time. Real judgement work.',
-  stalled:
-    'The agent knew what was wanted and never reached its action, while other ' +
-    'sessions on this topic did. These resolve nothing and still cost. Look at ' +
-    'what the action demands before you generate anything.',
+  inconsistent:
+    'Other sessions on this topic reach an action and these do not. The trace ' +
+    'does not say why. The agent may be asking for something it could already ' +
+    'have, or it may be answering another way. Read a few before you compile.',
   'too-few': 'Too few sessions to call this a pattern.',
 };
 
@@ -76,10 +76,10 @@ export function renderMarkdownReport(
   const tokens = clusters.reduce((n, c) => n + (c.tokens ?? 0), 0);
   const reducible = reducibleModelCalls(clusters);
   const wasted = clusters
-    .filter((c) => c.verdict === 'stalled')
+    .filter((c) => c.verdict === 'inconsistent')
     .reduce((n, c) => n + (c.tokens ?? 0), 0);
   const wastedSessions = clusters
-    .filter((c) => c.verdict === 'stalled')
+    .filter((c) => c.verdict === 'inconsistent')
     .reduce((n, c) => n + c.sessionCount, 0);
 
   const lines: string[] = [];
@@ -110,11 +110,11 @@ export function renderMarkdownReport(
 
   if (wastedSessions > 0) {
     lines.push(
-      `${plural(wastedSessions, 'session', 'sessions')} ended without reaching ` +
-        `an action the agent had already chosen` +
+      `${plural(wastedSessions, 'session', 'sessions')} did not reach an action ` +
+        `that other sessions on the same topic did reach` +
         (wasted > 0 ? `, at a cost of ${thousands(wasted)} tokens` : '') +
-        `. Those resolve nothing. Read the patterns marked "Fix the agent, not ` +
-        `the code" before you compile anything.`
+        `. Read the patterns marked "Sometimes acts, sometimes not" before you ` +
+        `compile anything.`
     );
     lines.push('');
   }

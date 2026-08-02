@@ -98,7 +98,7 @@ describe('renderMarkdownReport', () => {
     expect(report).toContain('not yet');
   });
 
-  it('calls out sessions that stalled before their action', () => {
+  it('calls out sessions whose topic acts elsewhere, without guessing why', () => {
     const mixed = clusterSessions([
       session({ sessionId: 'A1' }),
       session({ sessionId: 'A2' }),
@@ -106,9 +106,9 @@ describe('renderMarkdownReport', () => {
       session({ sessionId: 'B2', actionSequence: [], tokens: 5000 }),
     ]);
     const out = renderMarkdownReport(mixed);
-    expect(out).toContain('2 sessions ended without reaching an action');
+    expect(out).toContain('2 sessions did not reach an action');
     expect(out).toContain('10,000 tokens');
-    expect(out).toContain('Fix the agent, not the code');
+    expect(out).toContain('Sometimes acts, sometimes not');
   });
 
   it('says why cost is reported the way it is', () => {

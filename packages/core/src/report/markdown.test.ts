@@ -12,6 +12,7 @@ function session(partial: Partial<SessionRecord> & { sessionId: string }): Sessi
     params: {},
     outcome: 'resolved',
     credits: null,
+    tokens: null,
     intents: [],
     scores: { 'Relevance Score': '5' },
     stepCounts: {},
@@ -65,8 +66,35 @@ describe('renderMarkdownReport', () => {
     expect(report).not.toMatch(/\d[\d,.]*\s*(tokens?|credits?)\b/i);
   });
 
+  it('quotes tokens once metering has caught up', () => {
+    const metered = clusterSessions([
+      session({ sessionId: 'T1', tokens: 10000 }),
+      session({ sessionId: 'T2', tokens: 8500 }),
+    ]);
+    const out = renderMarkdownReport(metered);
+    expect(out).toContain('18,500 tokens');
+  });
+
+  it('says "not yet" rather than zero before metering lands', () => {
+    expect(report).toContain('not yet');
+  });
+
+  it('calls out sessions that stalled before their action', () => {
+    const mixed = clusterSessions([
+      session({ sessionId: 'A1' }),
+      session({ sessionId: 'A2' }),
+      session({ sessionId: 'B1', actionSequence: [], tokens: 5000 }),
+      session({ sessionId: 'B2', actionSequence: [], tokens: 5000 }),
+    ]);
+    const out = renderMarkdownReport(mixed);
+    expect(out).toContain('2 sessions ended without reaching an action');
+    expect(out).toContain('10,000 tokens');
+    expect(out).toContain('Fix the agent, not the code');
+  });
+
   it('says why cost is reported the way it is', () => {
     expect(report).toContain('an estimate would be a guess');
+    expect(report).toContain('lands hours after the trace does');
   });
 
   it('writes a clean table row', () => {
@@ -99,8 +127,8 @@ describe('renderMarkdownReport', () => {
     // One backslash in, three out: the backslash doubles, then the pipe gets
     // an escape of its own.
     expect(row).toContain('a\\\\\\|b');
-    // Six cells still, counting only the pipes no backslash escapes.
-    expect(row?.match(/(?<!\\)(?:\\\\)*\|/g)).toHaveLength(7);
+    // Seven cells still, counting only the pipes no backslash escapes.
+    expect(row?.match(/(?<!\\)(?:\\\\)*\|/g)).toHaveLength(8);
   });
 
   it('keeps a newline from ending the row', () => {

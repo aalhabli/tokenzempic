@@ -9,11 +9,16 @@
 import type { Cluster, Distillability } from '../cluster/cluster.js';
 import { reducibleModelCalls } from '../cluster/cluster.js';
 
+function thousands(n: number): string {
+  return n.toLocaleString('en-US');
+}
+
 const VERDICT_TEXT: Record<Distillability, string> = {
   distillable: 'Compile this',
   unscored: 'Look before you compile',
   'poor-quality': 'Fix the agent first',
   'no-actions': 'Leave it to the agent',
+  stalled: 'Fix the agent, not the code',
   'too-few': 'Not yet a pattern',
 };
 
@@ -22,6 +27,10 @@ const VERDICT_WHY: Record<Distillability, string> = {
   unscored: 'It repeats and runs actions, but nothing has scored it yet.',
   'poor-quality': 'The org scores it below the floor. Compiling would fix a bad answer in place.',
   'no-actions': 'The agent only reasoned. There is no deterministic path to compile to.',
+  stalled:
+    'The agent knew what was wanted and never reached its action, while other ' +
+    'sessions on this topic did. These resolve nothing and still cost. Look at ' +
+    'what the action demands before you generate anything.',
   'too-few': 'Too few sessions to call this a pattern.',
 };
 
@@ -59,7 +68,14 @@ export function renderMarkdownReport(
   const maxIntents = options.maxIntents ?? 5;
   const sessions = clusters.reduce((n, c) => n + c.sessionCount, 0);
   const modelCalls = clusters.reduce((n, c) => n + c.modelCalls, 0);
+  const tokens = clusters.reduce((n, c) => n + (c.tokens ?? 0), 0);
   const reducible = reducibleModelCalls(clusters);
+  const wasted = clusters
+    .filter((c) => c.verdict === 'stalled')
+    .reduce((n, c) => n + (c.tokens ?? 0), 0);
+  const wastedSessions = clusters
+    .filter((c) => c.verdict === 'stalled')
+    .reduce((n, c) => n + c.sessionCount, 0);
 
   const lines: string[] = [];
 
@@ -70,7 +86,8 @@ export function renderMarkdownReport(
   lines.push(
     `${plural(sessions, 'session falls', 'sessions fall')} into ` +
       `${plural(clusters.length, 'pattern', 'patterns')}. ` +
-      `They cost ${plural(modelCalls, 'model call', 'model calls')}.`
+      `They cost ${plural(modelCalls, 'model call', 'model calls')}` +
+      (tokens > 0 ? ` and ${thousands(tokens)} tokens.` : '.')
   );
   lines.push('');
 
@@ -86,16 +103,28 @@ export function renderMarkdownReport(
   }
   lines.push('');
 
+  if (wastedSessions > 0) {
+    lines.push(
+      `${plural(wastedSessions, 'session', 'sessions')} ended without reaching ` +
+        `an action the agent had already chosen` +
+        (wasted > 0 ? `, at a cost of ${thousands(wasted)} tokens` : '') +
+        `. Those resolve nothing. Read the patterns marked "Fix the agent, not ` +
+        `the code" before you compile anything.`
+    );
+    lines.push('');
+  }
+
   lines.push('## What the agent does');
   lines.push('');
-  lines.push('| Sessions | Pattern | Actions | Model calls each | Score | Verdict |');
-  lines.push('|---:|---|---|---:|---:|---|');
+  lines.push('| Sessions | Pattern | Actions | Model calls each | Tokens | Score | Verdict |');
+  lines.push('|---:|---|---|---:|---:|---:|---|');
   for (const c of clusters) {
     const cells = [
       String(c.sessionCount),
       escapeCell(c.signature),
       c.actions.length ? escapeCell(c.actions.join(', ')) : 'none',
       String(c.modelCallsPerSession),
+      c.tokens === null ? 'not yet' : thousands(c.tokens),
       c.qualityScore === null ? 'none' : c.qualityScore.toFixed(1),
       VERDICT_TEXT[c.verdict],
     ];
@@ -111,7 +140,8 @@ export function renderMarkdownReport(
     lines.push(
       `${plural(c.sessionCount, 'session', 'sessions')}, ` +
         `${plural(c.modelCalls, 'model call', 'model calls')}, ` +
-        `${c.modelCallsPerSession} per session.`
+        `${c.modelCallsPerSession} per session` +
+        (c.tokens === null ? '.' : `, ${thousands(c.tokens)} tokens.`)
     );
     lines.push('');
     lines.push(`**${VERDICT_TEXT[c.verdict]}.** ${VERDICT_WHY[c.verdict]}`);
@@ -131,9 +161,11 @@ export function renderMarkdownReport(
   lines.push('---');
   lines.push('');
   lines.push(
-    'Model calls are counted from the session trace. Token counts and credit ' +
-      'consumption are not reported, because they are not readable in every ' +
-      'org and an estimate would be a guess.'
+    'Model calls are counted from the session trace. Token counts come from ' +
+      'the org\'s own metering, which lands hours after the trace does, so a ' +
+      'recent pattern reads "not yet" rather than zero. No money figure is ' +
+      'given, because the rate depends on the contract and an estimate would ' +
+      'be a guess.'
   );
   lines.push('');
 

@@ -20,6 +20,12 @@ export type Distillability =
   | 'poor-quality'
   /** No actions ran, so there is no deterministic path to compile to. */
   | 'no-actions'
+  /**
+   * The agent recognised the intent and never reached the action, while other
+   * sessions on the same topic did. These cost tokens and resolve nothing, so
+   * the fix is the agent's inputs, not generated code.
+   */
+  | 'stalled'
   /** Too few sessions to call it a pattern. */
   | 'too-few';
 
@@ -33,8 +39,13 @@ export interface Cluster {
   sessionCount: number;
   /** Distinct intents Optimization recorded for these sessions. */
   intents: string[];
-  /** Model calls across the cluster. The cost figure that is measurable. */
+  /** Model calls across the cluster. Always available. */
   modelCalls: number;
+  /**
+   * Tokens across the cluster, when metering has caught up. Null while the
+   * org is still only reporting traces.
+   */
+  tokens: number | null;
   /** Mean model calls per session, to one decimal place. */
   modelCallsPerSession: number;
   /**
@@ -102,6 +113,7 @@ export function clusterSessions(
     if (!first) continue;
 
     const modelCalls = sessions.reduce((total, s) => total + s.modelCalls, 0);
+    const tokenTotal = sessions.reduce((total, s) => total + (s.tokens ?? 0), 0);
     const quality = meanScore(sessions, opts.qualityTagName);
 
     clusters.push({
@@ -112,10 +124,24 @@ export function clusterSessions(
       sessionCount: sessions.length,
       intents: [...new Set(sessions.flatMap((s) => s.intents))].sort(),
       modelCalls,
+      tokens: tokenTotal > 0 ? tokenTotal : null,
       modelCallsPerSession: Math.round((modelCalls / sessions.length) * 10) / 10,
       qualityScore: quality,
       verdict: judge(sessions.length, first.actionSequence, quality, opts),
     });
+  }
+
+  // A cluster that ran no actions is only agent-worthy work if nothing on that
+  // topic ever reaches an action. When a sibling cluster does, the agent knew
+  // what was wanted and never got there, which is a stall and not a judgement
+  // call. Telling a reader to "leave it to the agent" would be wrong.
+  const topicsThatAct = new Set(
+    clusters.filter((c) => c.actions.length > 0).map((c) => c.topic)
+  );
+  for (const c of clusters) {
+    if (c.verdict === 'no-actions' && c.topic !== null && topicsThatAct.has(c.topic)) {
+      c.verdict = 'stalled';
+    }
   }
 
   // Biggest first. The cluster that repeats most is the one worth compiling.

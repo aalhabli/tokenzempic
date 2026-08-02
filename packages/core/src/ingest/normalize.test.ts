@@ -75,7 +75,7 @@ const raw: RawTrace = {
       name: 'Get_Order_Status',
       stepType: 'ACTION_STEP',
       subType: 'flow',
-      inputValue: '{&quot;customer_email&quot;:&quot;maya.reyes@nimbuscoffee.example&quot;}',
+      inputValue: '{&quot;customer_email&quot;:&quot;dana.okafor@example.com&quot;}',
       outputValue: 'Order CO-00024: Delivered.',
       startedAt: '2026-08-02T11:53:18Z',
     }),
@@ -118,7 +118,7 @@ const raw: RawTrace = {
       sessionId: 'S2',
       interactionId: 'I3',
       messageType: 'Input',
-      content: 'has my coffee shipped yet?',
+      content: 'has my order shipped yet?',
       sentAt: '2026-08-02T11:53:24Z',
     },
   ],
@@ -183,7 +183,7 @@ describe('normalizeSessions', () => {
 
   it('decodes escaped JSON in action inputs', () => {
     expect(records[0].params).toEqual({
-      Get_Order_Status: { customer_email: 'maya.reyes@nimbuscoffee.example' },
+      Get_Order_Status: { customer_email: 'dana.okafor@example.com' },
     });
   });
 

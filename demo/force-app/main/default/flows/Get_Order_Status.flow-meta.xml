@@ -193,6 +193,7 @@
         </value>
     </processMetadataValues>
     <processType>AutoLaunchedFlow</processType>
+    <runInMode>SystemModeWithoutSharing</runInMode>
     <recordLookups>
         <name>Get_Order_By_Number</name>
         <label>Get Order By Number</label>

@@ -8,6 +8,7 @@ export {
   type Distillability,
 } from './cluster/cluster.js';
 export { renderMarkdownReport, type ReportOptions } from './report/markdown.js';
+export { groupBySimilarity, similarity, stability, tokenSet } from './cluster/similarity.js';
 export type {
   DataCloudQuery,
   DmoRow,

@@ -7,6 +7,13 @@ export interface SessionRecord {
   startedAt: string;
   /** What the user actually typed, turn by turn. */
   utterances: string[];
+  /** What the agent replied, in order. Needed to tell a stable answer from a varied one. */
+  responses: string[];
+  /**
+   * How many times the customer had to speak. A turn costs about three model
+   * calls, so this is the number that decides what a cluster is worth.
+   */
+  turns: number;
   /** Topic the reasoning engine classified the session into, if any. */
   topic: string | null;
   /** Ordered names of the actions (Flows, Apex, prompts) the agent invoked. */

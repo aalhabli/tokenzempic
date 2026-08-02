@@ -17,6 +17,7 @@ const VERDICT_TEXT: Record<Distillability, string> = {
   distillable: 'Compile this',
   unscored: 'Look before you compile',
   'poor-quality': 'Fix the agent first',
+  'static-answer': 'Write it down once',
   'no-actions': 'Leave it to the agent',
   stalled: 'Fix the agent, not the code',
   'too-few': 'Not yet a pattern',
@@ -26,7 +27,11 @@ const VERDICT_WHY: Record<Distillability, string> = {
   distillable: 'It repeats, it runs the same actions, and the org scores it well.',
   unscored: 'It repeats and runs actions, but nothing has scored it yet.',
   'poor-quality': 'The org scores it below the floor. Compiling would fix a bad answer in place.',
-  'no-actions': 'The agent only reasoned. There is no deterministic path to compile to.',
+  'static-answer':
+    'The same question keeps arriving and the agent writes the same answer every ' +
+    'time. It calls nothing, so there is nothing to speed up, only something to ' +
+    'stop regenerating. A knowledge article or a screen flow ends it.',
+  'no-actions': 'The agent only reasoned, and its answers differ each time. Real judgement work.',
   stalled:
     'The agent knew what was wanted and never reached its action, while other ' +
     'sessions on this topic did. These resolve nothing and still cost. Look at ' +
@@ -116,16 +121,19 @@ export function renderMarkdownReport(
 
   lines.push('## What the agent does');
   lines.push('');
-  lines.push('| Sessions | Pattern | Actions | Model calls each | Tokens | Score | Verdict |');
-  lines.push('|---:|---|---|---:|---:|---:|---|');
+  lines.push(
+    '| Sessions | Turns each | Pattern | Actions | Model calls each | Tokens | Same answer | Verdict |'
+  );
+  lines.push('|---:|---:|---|---|---:|---:|---:|---|');
   for (const c of clusters) {
     const cells = [
       String(c.sessionCount),
+      String(c.turnsPerSession),
       escapeCell(c.signature),
       c.actions.length ? escapeCell(c.actions.join(', ')) : 'none',
       String(c.modelCallsPerSession),
       c.tokens === null ? 'not yet' : thousands(c.tokens),
-      c.qualityScore === null ? 'none' : c.qualityScore.toFixed(1),
+      c.answerStability === null ? '-' : `${Math.round(c.answerStability * 100)}%`,
       VERDICT_TEXT[c.verdict],
     ];
     lines.push(`| ${cells.join(' | ')} |`);
@@ -139,6 +147,7 @@ export function renderMarkdownReport(
     lines.push('');
     lines.push(
       `${plural(c.sessionCount, 'session', 'sessions')}, ` +
+        `${plural(c.turns, 'customer turn', 'customer turns')}, ` +
         `${plural(c.modelCalls, 'model call', 'model calls')}, ` +
         `${c.modelCallsPerSession} per session` +
         (c.tokens === null ? '.' : `, ${thousands(c.tokens)} tokens.`)

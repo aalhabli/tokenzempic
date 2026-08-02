@@ -9,6 +9,7 @@
 
 import type { SessionRecord } from '../types.js';
 import { actionSignature } from './signature.js';
+import { groupBySimilarity, stability } from './similarity.js';
 
 /** Why a cluster is or is not worth compiling. */
 export type Distillability =
@@ -18,7 +19,12 @@ export type Distillability =
   | 'unscored'
   /** The org scores it badly. Compiling would harden a bad answer. */
   | 'poor-quality'
-  /** No actions ran, so there is no deterministic path to compile to. */
+  /**
+   * The agent answered the same question the same way every time, and called
+   * nothing. Write the answer down once instead of generating it again.
+   */
+  | 'static-answer'
+  /** No actions ran, and the answers differ every time. Real judgement work. */
   | 'no-actions'
   /**
    * The agent recognised the intent and never reached the action, while other
@@ -39,6 +45,15 @@ export interface Cluster {
   sessionCount: number;
   /** Distinct intents Optimization recorded for these sessions. */
   intents: string[];
+  /** Customer turns across the cluster. Turns are where the tokens are. */
+  turns: number;
+  /** Mean turns per session, to one decimal place. */
+  turnsPerSession: number;
+  /**
+   * How alike the agent's answers are, 0 to 1, or null when there are too few
+   * to judge. High means the agent rewrites the same answer every time.
+   */
+  answerStability: number | null;
   /** Model calls across the cluster. Always available. */
   modelCalls: number;
   /**
@@ -59,13 +74,24 @@ export interface Cluster {
 export interface ClusterOptions {
   /** Fewer sessions than this is noise, not a pattern. */
   minSessions?: number;
+  /** Overlap at which two intents count as the same question. */
+  intentThreshold?: number;
+  /** Answer overlap at which a cluster counts as having one fixed answer. */
+  stableAnswerThreshold?: number;
   /** Which Optimization score decides quality, and the floor it must clear. */
   qualityTagName?: string;
   minQualityScore?: number;
 }
 
+// Both thresholds are judgement calls with no ground truth behind them. They
+// are set where they separate the questions and answers seen in a real traced
+// org, and they are options so an org that disagrees can move them. Jaccard is
+// harsh on short text, so two wordings of one question often share only about
+// half their content words.
 const DEFAULTS = {
   minSessions: 2,
+  intentThreshold: 0.4,
+  stableAnswerThreshold: 0.45,
   qualityTagName: 'Relevance Score',
   minQualityScore: 4,
 };
@@ -82,9 +108,20 @@ function judge(
   sessionCount: number,
   actions: string[],
   quality: number | null,
+  answerStability: number | null,
   options: Required<ClusterOptions>
 ): Distillability {
-  if (actions.length === 0) return 'no-actions';
+  if (actions.length === 0) {
+    // An agent that answers well without calling anything is the case the
+    // action signature cannot see. Ask a different question of it: does the
+    // same question keep arriving, and does the answer keep coming out the
+    // same? If so it is a knowledge article or a screen flow, not judgement.
+    if (sessionCount < options.minSessions) return 'too-few';
+    if (answerStability !== null && answerStability >= options.stableAnswerThreshold) {
+      return 'static-answer';
+    }
+    return 'no-actions';
+  }
   if (sessionCount < options.minSessions) return 'too-few';
   if (quality === null) return 'unscored';
   if (quality < options.minQualityScore) return 'poor-quality';
@@ -107,28 +144,55 @@ export function clusterSessions(
 
   const clusters: Cluster[] = [];
   for (const [signature, sessions] of bySignature) {
-    // Every bucket was created with a session in it, so this only satisfies
-    // the compiler.
     const first = sessions[0];
     if (!first) continue;
 
-    const modelCalls = sessions.reduce((total, s) => total + s.modelCalls, 0);
-    const tokenTotal = sessions.reduce((total, s) => total + (s.tokens ?? 0), 0);
-    const quality = meanScore(sessions, opts.qualityTagName);
+    // A bucket with actions is already one pattern: the agent did the same
+    // work. A bucket without them is only one pattern by accident, so split it
+    // by what people asked for. Sorted first, so the grouping does not depend
+    // on the order rows came back from the query.
+    const parts =
+      first.actionSequence.length > 0
+        ? [sessions]
+        : groupBySimilarity(
+            sessions.slice().sort((a, b) => a.sessionId.localeCompare(b.sessionId)),
+            (r) => r.intents.join(' ') || r.utterances.join(' '),
+            opts.intentThreshold
+          );
 
-    clusters.push({
-      signature,
-      actions: first.actionSequence,
-      topic: first.topic,
-      sessions,
-      sessionCount: sessions.length,
-      intents: [...new Set(sessions.flatMap((s) => s.intents))].sort(),
-      modelCalls,
-      tokens: tokenTotal > 0 ? tokenTotal : null,
-      modelCallsPerSession: Math.round((modelCalls / sessions.length) * 10) / 10,
-      qualityScore: quality,
-      verdict: judge(sessions.length, first.actionSequence, quality, opts),
-    });
+    for (const part of parts) {
+      const lead = part[0];
+      if (!lead) continue;
+      const modelCalls = part.reduce((n, s) => n + s.modelCalls, 0);
+      const tokenTotal = part.reduce((n, s) => n + (s.tokens ?? 0), 0);
+      const turns = part.reduce((n, s) => n + s.turns, 0);
+      const quality = meanScore(part, opts.qualityTagName);
+      const answerStability = stability(part.flatMap((s) => s.responses));
+
+      // Name a split cluster after the question, so the report does not show
+      // five rows all called general_support.
+      const label =
+        parts.length > 1 && lead.intents[0]
+          ? `${signature} > ${lead.intents[0]}`
+          : signature;
+
+      clusters.push({
+        signature: label,
+        actions: lead.actionSequence,
+        topic: lead.topic,
+        sessions: part,
+        sessionCount: part.length,
+        intents: [...new Set(part.flatMap((s) => s.intents))].sort(),
+        turns,
+        turnsPerSession: Math.round((turns / part.length) * 10) / 10,
+        modelCalls,
+        tokens: tokenTotal > 0 ? tokenTotal : null,
+        modelCallsPerSession: Math.round((modelCalls / part.length) * 10) / 10,
+        qualityScore: quality,
+        answerStability,
+        verdict: judge(part.length, lead.actionSequence, quality, answerStability, opts),
+      });
+    }
   }
 
   // A cluster that ran no actions is only agent-worthy work if nothing on that
@@ -144,9 +208,11 @@ export function clusterSessions(
     }
   }
 
-  // Biggest first. The cluster that repeats most is the one worth compiling.
+  // Rank by the work a cluster costs, not by how often it appears. Turns carry
+  // the tokens, so a four-turn pattern seen twenty times outranks a one-turn
+  // pattern seen sixty.
   return clusters.sort(
-    (a, b) => b.sessionCount - a.sessionCount || b.modelCalls - a.modelCalls
+    (a, b) => b.turns - a.turns || b.sessionCount - a.sessionCount || b.modelCalls - a.modelCalls
   );
 }
 

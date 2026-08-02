@@ -86,6 +86,35 @@ describe('renderMarkdownReport', () => {
     expect(renderMarkdownReport(odd)).toContain('a\\|b');
   });
 
+  it('escapes the backslash before the pipe, so an escaped pipe cannot break out', () => {
+    // 'a\\|b' would become 'a\\\\|b' if only the pipe were escaped: the backslash
+    // escapes the backslash and the pipe ends the cell.
+    const odd = clusterSessions([
+      session({ sessionId: 'Y1', topic: 'a\\|b' }),
+      session({ sessionId: 'Y2', topic: 'a\\|b' }),
+    ]);
+    const row = renderMarkdownReport(odd)
+      .split('\n')
+      .find((l) => l.startsWith('| 2 '));
+    // One backslash in, three out: the backslash doubles, then the pipe gets
+    // an escape of its own.
+    expect(row).toContain('a\\\\\\|b');
+    // Six cells still, counting only the pipes no backslash escapes.
+    expect(row?.match(/(?<!\\)(?:\\\\)*\|/g)).toHaveLength(7);
+  });
+
+  it('keeps a newline from ending the row', () => {
+    const odd = clusterSessions([
+      session({ sessionId: 'Z1', topic: 'a\nb' }),
+      session({ sessionId: 'Z2', topic: 'a\nb' }),
+    ]);
+    const rows = renderMarkdownReport(odd)
+      .split('\n')
+      .filter((l) => l.startsWith('| 2 '));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain('a b');
+  });
+
   it('reports honestly when nothing is ready', () => {
     const none = clusterSessions([session({ sessionId: 'N1', actionSequence: [] })]);
     expect(renderMarkdownReport(none)).toContain('Nothing here is ready to compile yet.');

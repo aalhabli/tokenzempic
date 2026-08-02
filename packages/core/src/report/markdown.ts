@@ -25,8 +25,18 @@ const VERDICT_WHY: Record<Distillability, string> = {
   'too-few': 'Too few sessions to call this a pattern.',
 };
 
-function escapePipes(text: string): string {
-  return text.replace(/\|/g, '\\|');
+/**
+ * Makes text safe to put in a table cell.
+ *
+ * Backslashes go first. Escaping the pipe in `a\|b` without them produces
+ * `a\\|b`, where the backslash escapes the backslash and the pipe breaks the
+ * row. A newline ends the row outright, so those collapse to a space.
+ */
+function escapeCell(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/[\r\n]+/g, ' ');
 }
 
 function plural(count: number, one: string, many: string): string {
@@ -83,8 +93,8 @@ export function renderMarkdownReport(
   for (const c of clusters) {
     const cells = [
       String(c.sessionCount),
-      escapePipes(c.signature),
-      c.actions.length ? escapePipes(c.actions.join(', ')) : 'none',
+      escapeCell(c.signature),
+      c.actions.length ? escapeCell(c.actions.join(', ')) : 'none',
       String(c.modelCallsPerSession),
       c.qualityScore === null ? 'none' : c.qualityScore.toFixed(1),
       VERDICT_TEXT[c.verdict],

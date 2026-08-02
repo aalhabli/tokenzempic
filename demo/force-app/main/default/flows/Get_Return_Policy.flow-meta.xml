@@ -14,7 +14,7 @@
             </value>
         </assignmentItems>
     </assignments>
-    <description>Returns the Nimbus Coffee return and refund policy. Takes no inputs. Use it whenever a customer asks about returns, refunds, or exchanges.</description>
+    <description>Returns the Nimbus Coffee return and refund policy. Use it whenever a customer asks about returns, refunds, or exchanges.</description>
     <environments>Default</environments>
     <interviewLabel>Get Return Policy {!$Flow.CurrentDateTime}</interviewLabel>
     <label>Get Return Policy</label>
@@ -46,5 +46,13 @@
         <isCollection>false</isCollection>
         <isInput>false</isInput>
         <isOutput>true</isOutput>
+    </variables>
+    <variables>
+        <description>The type of coffee product the customer asks about, for example beans, pods, or equipment. Optional. The policy is the same for every product type, so leave it blank if the customer does not say.</description>
+        <name>product_type</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
     </variables>
 </Flow>

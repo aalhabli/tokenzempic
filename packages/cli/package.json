@@ -13,9 +13,9 @@
     "node": ">=22.5.0"
   },
   "dependencies": {
-    "@oclif/core": "^4.13.2",
-    "@salesforce/core": "^8.32.6",
-    "@salesforce/sf-plugins-core": "^12.2.28",
+    "@oclif/core": "^5.0.0",
+    "@salesforce/core": "^9.1.10",
+    "@salesforce/sf-plugins-core": "^13.0.4",
     "@tokenzempic/core": "0.0.1",
     "@tokenzempic/tui": "0.0.1"
   },
